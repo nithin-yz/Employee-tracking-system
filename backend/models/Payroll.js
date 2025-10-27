@@ -69,7 +69,7 @@ const payrollSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: ['draft', 'calculated', 'approved', 'paid'],
-    default: 'draft'
+    default: 'calculated'
   },
   processedBy: {
     type: mongoose.Schema.Types.ObjectId,

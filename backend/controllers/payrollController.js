@@ -96,15 +96,6 @@ const createPayroll = async (req, res) => {
       return res.status(400).json({ message: 'No approved timesheets found for this employee' });
     }
 
-    // Check if payroll already exists for this employee
-    const existingPayroll = await Payroll.findOne({
-      employee: employeeId
-    });
-
-    if (existingPayroll) {
-      return res.status(400).json({ message: 'Payroll already exists for this employee' });
-    }
-
     // Calculate totals
     const totalRegularHours = timesheets.reduce((sum, ts) => sum + (ts.regularHours || 0), 0);
     const totalOvertimeHours = timesheets.reduce((sum, ts) => sum + (ts.overtimeHours || 0), 0);
