@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   Container,
   Paper,
@@ -11,7 +11,6 @@ import {
   TableHead,
   TableRow,
   Chip,
-  Button,
   TextField,
   Grid,
   Pagination,
@@ -172,7 +171,7 @@ export default function Timesheets() {
             <Pagination
               count={timesheetsData.totalPages}
               page={page}
-              onChange={(event, value) => setPage(value)}
+              onChange={(_, value) => setPage(value)}
               color="primary"
             />
           </Box>
