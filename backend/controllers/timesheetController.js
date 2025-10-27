@@ -202,6 +202,15 @@ const approveTimesheet = async (req, res) => {
       return res.status(404).json({ message: 'Timesheet not found' });
     }
 
+    // Check if employee has properly clocked out (completed their session)
+    if (!timesheet.clockOut) {
+      return res.status(400).json({ 
+        message: 'Cannot approve timesheet. Employee has not clocked out yet.',
+        canApprove: false,
+        reason: 'Employee must clock out before timesheet can be approved'
+      });
+    }
+
     // Manager can approve any timesheet (one manager for all employees)
     console.log('Manager approving timesheet:', timesheet._id);
 
@@ -269,6 +278,7 @@ const getTeamTimesheets = async (req, res) => {
       console.log('Manager accessing all pending timesheets');
       console.log('Manager user:', req.user);
       query.status = 'pending'; // Only show pending timesheets
+      // Remove the clockOut filter - show all pending timesheets
     }
     
     if (startDate && endDate) {
@@ -295,8 +305,15 @@ const getTeamTimesheets = async (req, res) => {
     const total = await Timesheet.countDocuments(query);
     console.log('Total timesheets matching query:', total);
 
+    // Add canApprove field to each timesheet for managers
+    const timesheetsWithApprovalStatus = timesheets.map(timesheet => {
+      const timesheetObj = timesheet.toObject();
+      timesheetObj.canApprove = !!timesheet.clockOut; // Can approve only if clocked out
+      return timesheetObj;
+    });
+
     res.json({
-      timesheets,
+      timesheets: timesheetsWithApprovalStatus,
       totalPages: Math.ceil(total / limit),
       currentPage: page,
       total
@@ -369,6 +386,275 @@ const debugTimesheets = async (req, res) => {
   }
 };
 
+// @desc    Get current clock status for employee
+// @route   GET /api/timesheets/current-status
+// @access  Private
+const getCurrentStatus = async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Find today's timesheet
+    const timesheet = await Timesheet.findOne({
+      employee: req.user.id,
+      date: {
+        $gte: today,
+        $lt: tomorrow
+      }
+    });
+
+    if (!timesheet) {
+      return res.json({
+        isClockedIn: false,
+        isOnBreak: false,
+        clockInTime: null,
+        clockOutTime: null,
+        totalHours: 0
+      });
+    }
+
+    const now = new Date();
+    const isClockedIn = timesheet.clockIn && !timesheet.clockOut;
+    const isOnBreak = timesheet.breakStart && !timesheet.breakEnd;
+    const isSessionCompleted = timesheet.clockIn && timesheet.clockOut;
+
+    // Calculate total hours worked today
+    let totalHours = 0;
+    if (timesheet.clockIn) {
+      const endTime = timesheet.clockOut || now;
+      totalHours = (endTime - timesheet.clockIn) / (1000 * 60 * 60);
+      
+      // Subtract break time if applicable
+      if (timesheet.breakStart && timesheet.breakEnd) {
+        const breakTime = (timesheet.breakEnd - timesheet.breakStart) / (1000 * 60 * 60);
+        totalHours -= breakTime;
+      } else if (timesheet.breakStart && !timesheet.breakEnd) {
+        // Currently on break, don't subtract break time yet
+        const currentBreakTime = (now - timesheet.breakStart) / (1000 * 60 * 60);
+        totalHours -= currentBreakTime;
+      }
+    }
+
+    // Check if employee can clock out (minimum 4 hours)
+    const canClockOut = isClockedIn && totalHours >= 4;
+
+    res.json({
+      isClockedIn,
+      isOnBreak,
+      isSessionCompleted,
+      canClockOut,
+      clockInTime: timesheet.clockIn,
+      clockOutTime: timesheet.clockOut,
+      totalHours: Math.max(0, totalHours)
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Clock in for the day
+// @route   POST /api/timesheets/clock-in
+// @access  Private
+const clockIn = async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Check if already clocked in today
+    const existingTimesheet = await Timesheet.findOne({
+      employee: req.user.id,
+      date: {
+        $gte: today,
+        $lt: tomorrow
+      }
+    });
+
+    if (existingTimesheet && existingTimesheet.clockIn && !existingTimesheet.clockOut) {
+      return res.status(400).json({ message: 'Already clocked in today' });
+    }
+
+    const clockInTime = new Date();
+    const { location } = req.body;
+    
+    if (existingTimesheet) {
+      // Update existing timesheet
+      existingTimesheet.clockIn = clockInTime;
+      existingTimesheet.status = 'pending';
+      if (location) {
+        existingTimesheet.location = location;
+      }
+      await existingTimesheet.save();
+    } else {
+      // Create new timesheet
+      const timesheetData = {
+        employee: req.user.id,
+        date: today,
+        clockIn: clockInTime,
+        status: 'pending'
+      };
+      
+      if (location) {
+        timesheetData.location = location;
+      }
+      
+      const timesheet = new Timesheet(timesheetData);
+      await timesheet.save();
+    }
+
+    res.json({ message: 'Clocked in successfully', clockInTime });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Clock out for the day
+// @route   PUT /api/timesheets/clock-out
+// @access  Private
+const clockOut = async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const timesheet = await Timesheet.findOne({
+      employee: req.user.id,
+      date: {
+        $gte: today,
+        $lt: tomorrow
+      }
+    });
+
+    if (!timesheet || !timesheet.clockIn) {
+      return res.status(400).json({ message: 'Not clocked in today' });
+    }
+
+    if (timesheet.clockOut) {
+      return res.status(400).json({ message: 'Already clocked out today' });
+    }
+
+    const clockOutTime = new Date();
+    const { location } = req.body;
+    
+    timesheet.clockOut = clockOutTime;
+    
+    // Save location if provided
+    if (location) {
+      timesheet.location = location;
+    }
+
+    // Calculate hours worked
+    let totalHours = (clockOutTime - timesheet.clockIn) / (1000 * 60 * 60);
+    let breakHours = 0;
+
+    if (timesheet.breakStart && timesheet.breakEnd) {
+      breakHours = (timesheet.breakEnd - timesheet.breakStart) / (1000 * 60 * 60);
+      totalHours -= breakHours;
+    }
+
+    timesheet.totalHours = totalHours;
+    timesheet.regularHours = Math.min(totalHours, 8);
+    timesheet.overtimeHours = Math.max(totalHours - 8, 0);
+    timesheet.breakHours = breakHours;
+    
+    // Check for early clock out (less than 4 hours)
+    if (totalHours < 4) {
+      timesheet.isEarlyClockOut = true;
+      timesheet.earlyClockOutReason = `Clocked out after only ${totalHours.toFixed(2)} hours (minimum 4 hours required)`;
+    }
+
+    await timesheet.save();
+
+    res.json({ message: 'Clocked out successfully', clockOutTime });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Start break
+// @route   PUT /api/timesheets/break-start
+// @access  Private
+const breakStart = async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const timesheet = await Timesheet.findOne({
+      employee: req.user.id,
+      date: {
+        $gte: today,
+        $lt: tomorrow
+      }
+    });
+
+    if (!timesheet || !timesheet.clockIn || timesheet.clockOut) {
+      return res.status(400).json({ message: 'Must be clocked in to start break' });
+    }
+
+    if (timesheet.breakStart && !timesheet.breakEnd) {
+      return res.status(400).json({ message: 'Already on break' });
+    }
+
+    timesheet.breakStart = new Date();
+    await timesheet.save();
+
+    res.json({ message: 'Break started successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    End break
+// @route   PUT /api/timesheets/break-end
+// @access  Private
+const breakEnd = async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const timesheet = await Timesheet.findOne({
+      employee: req.user.id,
+      date: {
+        $gte: today,
+        $lt: tomorrow
+      }
+    });
+
+    if (!timesheet || !timesheet.clockIn || timesheet.clockOut) {
+      return res.status(400).json({ message: 'Must be clocked in to end break' });
+    }
+
+    if (!timesheet.breakStart || timesheet.breakEnd) {
+      return res.status(400).json({ message: 'Not currently on break' });
+    }
+
+    timesheet.breakEnd = new Date();
+    await timesheet.save();
+
+    res.json({ message: 'Break ended successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   getTimesheets,
   getTimesheetById,
@@ -378,5 +664,10 @@ module.exports = {
   rejectTimesheet,
   getTeamTimesheets,
   getApprovedTimesheetsForPayroll,
-  debugTimesheets
+  debugTimesheets,
+  getCurrentStatus,
+  clockIn,
+  clockOut,
+  breakStart,
+  breakEnd
 };

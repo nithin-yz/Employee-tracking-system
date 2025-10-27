@@ -72,7 +72,7 @@ export default function Layout() {
   );
 
   const drawer = (
-    <div>
+    <div className=''>
       <Toolbar>
         <Typography variant="h6" noWrap component="div">
           TimeTracker

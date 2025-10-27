@@ -293,6 +293,36 @@ const getTeamCalendar = async (req, res) => {
   }
 };
 
+// @desc    Delete leave request
+// @route   DELETE /api/leaves/:id
+// @access  Private
+const deleteLeave = async (req, res) => {
+  try {
+    const leave = await Leave.findById(req.params.id);
+    
+    if (!leave) {
+      return res.status(404).json({ message: 'Leave request not found' });
+    }
+
+    // Check authorization - only allow deletion of own leaves or HR admin
+    if (req.user.role !== 'hr_admin' && leave.employee.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized to delete this leave request' });
+    }
+
+    // Only allow deletion of pending leaves
+    if (leave.status !== 'pending') {
+      return res.status(400).json({ message: 'Can only delete pending leave requests' });
+    }
+
+    await Leave.findByIdAndDelete(req.params.id);
+
+    res.json({ message: 'Leave request deleted successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   getLeaves,
   getLeaveById,
@@ -300,6 +330,7 @@ module.exports = {
   updateLeave,
   approveLeave,
   rejectLeave,
+  deleteLeave,
   getTeamLeaves,
   getTeamCalendar
 };

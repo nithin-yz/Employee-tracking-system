@@ -145,6 +145,12 @@ export default function ManagerDashboard() {
   };
 
   const handleApproveTimesheet = (id: string) => {
+    // Find the timesheet to check if it can be approved
+    const timesheet = timesheetsData?.timesheets?.find((t: any) => t._id === id);
+    if (timesheet && !timesheet.canApprove) {
+      alert('Cannot approve timesheet. Employee must clock out before the timesheet can be approved.');
+      return;
+    }
     approveTimesheetMutation.mutate({ id });
   };
 
@@ -277,7 +283,18 @@ export default function ManagerDashboard() {
                           <TableCell>
                             {format(new Date(timesheet.date), 'MMM dd')}
                           </TableCell>
-                          <TableCell>{timesheet.totalHours?.toFixed(2)}</TableCell>
+                          <TableCell>
+                            {timesheet.totalHours?.toFixed(2)}
+                            {timesheet.isEarlyClockOut && (
+                              <Chip 
+                                label="⚠️ Early Clock Out" 
+                                color="warning" 
+                                size="small" 
+                                sx={{ ml: 1 }}
+                                title={timesheet.earlyClockOutReason}
+                              />
+                            )}
+                          </TableCell>
                           <TableCell>{getStatusChip(timesheet.status)}</TableCell>
                           <TableCell>
                             {timesheet.status === 'pending' && (
@@ -286,7 +303,8 @@ export default function ManagerDashboard() {
                                   size="small"
                                   color="success"
                                   onClick={() => handleApproveTimesheet(timesheet._id)}
-                                  disabled={approveTimesheetMutation.isPending}
+                                  disabled={approveTimesheetMutation.isPending || !timesheet.canApprove}
+                                  title={!timesheet.canApprove ? "Employee must clock out before approval" : ""}
                                 >
                                   Approve
                                 </Button>
@@ -298,6 +316,15 @@ export default function ManagerDashboard() {
                                 >
                                   Reject
                                 </Button>
+                                {!timesheet.canApprove && (
+                                  <Chip 
+                                    label="⏰ Not Clocked Out" 
+                                    color="warning" 
+                                    size="small" 
+                                    sx={{ ml: 1 }}
+                                    title="Employee has not clocked out yet"
+                                  />
+                                )}
                               </>
                             )}
                           </TableCell>

@@ -38,6 +38,18 @@ const timesheetSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  breakHours: {
+    type: Number,
+    default: 0
+  },
+  isEarlyClockOut: {
+    type: Boolean,
+    default: false
+  },
+  earlyClockOutReason: {
+    type: String,
+    trim: true
+  },
   status: {
     type: String,
     enum: ['pending', 'approved', 'rejected'],

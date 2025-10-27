@@ -3,7 +3,6 @@ const { body } = require('express-validator');
 const { auth, authorize } = require('../middleware/auth');
 const { 
   getEmployees, 
-  getEmployeeById, 
   createEmployee, 
   updateEmployee, 
   deleteEmployee 
@@ -15,11 +14,6 @@ const router = express.Router();
 // @desc    Get all employees
 // @access  Private (HR Admin)
 router.get('/', auth, authorize('hr_admin'), getEmployees);
-
-// @route   GET /api/employees/:id
-// @desc    Get employee by ID
-// @access  Private (HR Admin)
-router.get('/:id', auth, authorize('hr_admin'), getEmployeeById);
 
 // @route   POST /api/employees
 // @desc    Create new employee

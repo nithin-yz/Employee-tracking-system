@@ -11,12 +11,17 @@ import {
   Chip,
   Alert,
   CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import {
   PlayArrow,
   Stop,
   Pause,
   PlayCircleOutline,
+  CheckCircle,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
@@ -24,6 +29,8 @@ import { format } from 'date-fns';
 
 export default function EmployeePortal() {
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [currentHours, setCurrentHours] = useState(0);
   const queryClient = useQueryClient();
 
   const { data: currentStatus, isLoading: statusLoading } = useQuery({
@@ -93,17 +100,72 @@ export default function EmployeePortal() {
   };
 
   const handleClockIn = () => {
-    getCurrentLocation();
-    clockInMutation.mutate({ location });
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const locationData = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          };
+          setLocation(locationData);
+          clockInMutation.mutate({ location: locationData });
+        },
+        (error) => {
+          console.error('Error getting location:', error);
+          // Clock in without location if geolocation fails
+          clockInMutation.mutate({ location: null });
+        }
+      );
+    } else {
+      // Clock in without location if geolocation is not supported
+      clockInMutation.mutate({ location: null });
+    }
   };
 
   const handleClockOut = () => {
     if (!currentStatus?.isClockedIn) return; // extra safety
-    clockOutMutation.mutate(undefined, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ['currentStatus'] });
-      },
-    });
+    
+    // Calculate current hours worked
+    const now = new Date();
+    const clockInTime = new Date(currentStatus.clockInTime);
+    const hoursWorked = (now.getTime() - clockInTime.getTime()) / (1000 * 60 * 60);
+    
+    // If less than 4 hours, show confirmation dialog
+    if (hoursWorked < 4) {
+      setCurrentHours(hoursWorked);
+      setConfirmDialogOpen(true);
+    } else {
+      // Clock out normally if 4+ hours
+      performClockOut();
+    }
+  };
+
+  const performClockOut = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const locationData = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          };
+          setLocation(locationData);
+          clockOutMutation.mutate({ location: locationData });
+        },
+        (error) => {
+          console.error('Error getting location:', error);
+          // Clock out without location if geolocation fails
+          clockOutMutation.mutate({ location: null });
+        }
+      );
+    } else {
+      // Clock out without location if geolocation is not supported
+      clockOutMutation.mutate({ location: null });
+    }
+  };
+
+  const confirmClockOut = () => {
+    setConfirmDialogOpen(false);
+    performClockOut();
   };
 
   const handleBreakStart = () => {
@@ -137,9 +199,9 @@ export default function EmployeePortal() {
         </Typography>
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
           <Chip
-            icon={currentStatus?.isClockedIn ? <PlayArrow /> : <Stop />}
-            label={currentStatus?.isClockedIn ? 'Clocked In' : 'Not Clocked In'}
-            color={currentStatus?.isClockedIn ? 'success' : 'default'}
+            icon={currentStatus?.isSessionCompleted ? <CheckCircle /> : currentStatus?.isClockedIn ? <PlayArrow /> : <Stop />}
+            label={currentStatus?.isSessionCompleted ? 'Session Completed' : currentStatus?.isClockedIn ? 'Clocked In' : 'Not Clocked In'}
+            color={currentStatus?.isSessionCompleted ? 'success' : currentStatus?.isClockedIn ? 'success' : 'default'}
           />
           {currentStatus?.isOnBreak && (
             <Chip
@@ -168,6 +230,22 @@ export default function EmployeePortal() {
         )}
       </Paper>
 
+      {/* Session Completed Message */}
+      {currentStatus?.isSessionCompleted && (
+        <Alert severity="success" sx={{ mb: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            ✅ Today's Session Completed!
+          </Typography>
+          <Typography variant="body2">
+            You have already completed your work session for today. 
+            Total hours worked: <strong>{currentStatus.totalHours.toFixed(2)} hours</strong>
+          </Typography>
+          <Typography variant="body2" sx={{ mt: 1 }}>
+            Your timesheet is now pending manager approval.
+          </Typography>
+        </Alert>
+      )}
+
       {/* Action Buttons */}
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>
@@ -177,7 +255,14 @@ export default function EmployeePortal() {
                 Clock In/Out
               </Typography>
               <Box sx={{ display: 'flex', gap: 2, flexDirection: 'column' }}>
-                {!currentStatus?.isClockedIn ? (
+                {currentStatus?.isSessionCompleted ? (
+                  <Alert severity="info">
+                    <Typography variant="body2">
+                      Your work session for today is complete. 
+                      No further clock in/out actions are needed.
+                    </Typography>
+                  </Alert>
+                ) : !currentStatus?.isClockedIn ? (
                   <Button
                     variant="contained"
                     color="success"
@@ -214,7 +299,13 @@ export default function EmployeePortal() {
                 Break Management
               </Typography>
               <Box sx={{ display: 'flex', gap: 2, flexDirection: 'column' }}>
-                {currentStatus?.isClockedIn && !currentStatus?.isClockedOut && (
+                {currentStatus?.isSessionCompleted ? (
+                  <Alert severity="info">
+                    <Typography variant="body2">
+                      Break management is not available after completing your work session.
+                    </Typography>
+                  </Alert>
+                ) : currentStatus?.isClockedIn && !currentStatus?.isClockedOut ? (
                   <>
                     {!currentStatus?.isOnBreak ? (
                       <Button
@@ -242,8 +333,7 @@ export default function EmployeePortal() {
                       </Button>
                     )}
                   </>
-                )}
-                {!currentStatus?.isClockedIn && (
+                ) : (
                   <Alert severity="info">
                     You need to clock in before you can take a break.
                   </Alert>
@@ -269,6 +359,40 @@ export default function EmployeePortal() {
           }
         </Alert>
       )}
+
+      {/* Early Clock Out Confirmation Dialog */}
+      <Dialog open={confirmDialogOpen} onClose={() => setConfirmDialogOpen(false)}>
+        <DialogTitle>⚠️ Early Clock Out Warning</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" gutterBottom>
+            You have only worked for <strong>{currentHours.toFixed(2)} hours</strong> today.
+          </Typography>
+          <Typography variant="body1" gutterBottom>
+            <strong>Company Policy:</strong>
+          </Typography>
+          <Typography variant="body2" component="div" sx={{ ml: 2 }}>
+            • Half day = 4 hours minimum<br/>
+            • Full day = 8 hours<br/>
+            • Clocking out before 4 hours breaks company rules
+          </Typography>
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            Are you sure you want to clock out early? This will be flagged for manager review.
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={confirmClockOut} 
+            variant="contained" 
+            color="error"
+            disabled={clockOutMutation.isPending}
+          >
+            {clockOutMutation.isPending ? <CircularProgress size={24} /> : 'Yes, Clock Out'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }

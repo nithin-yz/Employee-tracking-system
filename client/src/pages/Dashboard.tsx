@@ -142,9 +142,9 @@ export default function Dashboard() {
           </Typography>
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
             <Chip
-              icon={currentStatus.isClockedIn ? <CheckCircle /> : <Pending />}
-              label={currentStatus.isClockedIn ? 'Clocked In' : 'Not Clocked In'}
-              color={currentStatus.isClockedIn ? 'success' : 'default'}
+              icon={currentStatus.isSessionCompleted ? <CheckCircle /> : currentStatus.isClockedIn ? <CheckCircle /> : <Pending />}
+              label={currentStatus.isSessionCompleted ? 'Session Completed' : currentStatus.isClockedIn ? 'Clocked In' : 'Not Clocked In'}
+              color={currentStatus.isSessionCompleted ? 'success' : currentStatus.isClockedIn ? 'success' : 'default'}
             />
             {currentStatus.isOnBreak && (
               <Chip
