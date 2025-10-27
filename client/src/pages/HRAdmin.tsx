@@ -599,20 +599,36 @@ export default function HRAdmin() {
               </FormControl>
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Department"
-                value={newEmployee.department}
-                onChange={(e) => setNewEmployee({ ...newEmployee, department: e.target.value })}
-              />
+              <FormControl fullWidth>
+                <InputLabel>Department</InputLabel>
+                <Select
+                  value={newEmployee.department}
+                  label="Department"
+                  onChange={(e) => setNewEmployee({ ...newEmployee, department: e.target.value })}
+                >
+                  <MenuItem value="Engineering">Engineering</MenuItem>
+                  <MenuItem value="Marketing">Marketing</MenuItem>
+                  <MenuItem value="Sales">Sales</MenuItem>
+                  <MenuItem value="Human Resources">Human Resources</MenuItem>
+                  <MenuItem value="Finance">Finance</MenuItem>
+                </Select>
+              </FormControl>
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Position"
-                value={newEmployee.position}
-                onChange={(e) => setNewEmployee({ ...newEmployee, position: e.target.value })}
-              />
+              <FormControl fullWidth>
+                <InputLabel>Position</InputLabel>
+                <Select
+                  value={newEmployee.position}
+                  label="Position"
+                  onChange={(e) => setNewEmployee({ ...newEmployee, position: e.target.value })}
+                >
+                  <MenuItem value="Software Developer">Software Developer</MenuItem>
+                  <MenuItem value="Marketing Manager">Marketing Manager</MenuItem>
+                  <MenuItem value="Sales Representative">Sales Representative</MenuItem>
+                  <MenuItem value="HR Specialist">HR Specialist</MenuItem>
+                  <MenuItem value="Financial Analyst">Financial Analyst</MenuItem>
+                </Select>
+              </FormControl>
             </Grid>
             <Grid item xs={12} sm={6}>
               <TextField
@@ -686,20 +702,36 @@ export default function HRAdmin() {
                 </FormControl>
               </Grid>
               <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Department"
-                  value={editingEmployee.department || ''}
-                  onChange={(e) => setEditingEmployee({ ...editingEmployee, department: e.target.value })}
-                />
+                <FormControl fullWidth>
+                  <InputLabel>Department</InputLabel>
+                  <Select
+                    value={editingEmployee.department || ''}
+                    label="Department"
+                    onChange={(e) => setEditingEmployee({ ...editingEmployee, department: e.target.value })}
+                  >
+                    <MenuItem value="Engineering">Engineering</MenuItem>
+                    <MenuItem value="Marketing">Marketing</MenuItem>
+                    <MenuItem value="Sales">Sales</MenuItem>
+                    <MenuItem value="Human Resources">Human Resources</MenuItem>
+                    <MenuItem value="Finance">Finance</MenuItem>
+                  </Select>
+                </FormControl>
               </Grid>
               <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Position"
-                  value={editingEmployee.position || ''}
-                  onChange={(e) => setEditingEmployee({ ...editingEmployee, position: e.target.value })}
-                />
+                <FormControl fullWidth>
+                  <InputLabel>Position</InputLabel>
+                  <Select
+                    value={editingEmployee.position || ''}
+                    label="Position"
+                    onChange={(e) => setEditingEmployee({ ...editingEmployee, position: e.target.value })}
+                  >
+                    <MenuItem value="Software Developer">Software Developer</MenuItem>
+                    <MenuItem value="Marketing Manager">Marketing Manager</MenuItem>
+                    <MenuItem value="Sales Representative">Sales Representative</MenuItem>
+                    <MenuItem value="HR Specialist">HR Specialist</MenuItem>
+                    <MenuItem value="Financial Analyst">Financial Analyst</MenuItem>
+                  </Select>
+                </FormControl>
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField

@@ -5,9 +5,7 @@ import App from './App.tsx'
 import axios from 'axios'
 
 // Set up axios defaults
-axios.defaults.baseURL = process.env.NODE_ENV === 'production' 
-  ? 'https://your-production-url.herokuapp.com' 
-  : 'http://localhost:5000';
+axios.defaults.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
