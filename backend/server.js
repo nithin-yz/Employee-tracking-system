@@ -19,6 +19,12 @@ app.use('/api/leaves', require('./routes/leaves'));
 app.use('/api/payroll', require('./routes/payroll'));
 app.use('/api/reports', require('./routes/reports'));
 
+app.get('/ping', (req, res) => {
+  res.status(200).send('pong');
+});
+
+
+
 // Serve static files from React build
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, 'client/build')));
